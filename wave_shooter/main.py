@@ -21,6 +21,11 @@ mountain_img = pygame.image.load("Assets/img/background/mountain.png").convert_a
 pine1_img = pygame.image.load("Assets/img/background/pine1.png").convert_alpha()
 pine2_img = pygame.image.load("Assets/img/background/pine2.png").convert_alpha()
 
+# Load UI images
+heart_img = pygame.image.load("Assets/img/icons/heart.png").convert_alpha() if os.path.exists("Assets/img/icons/heart.png") else pygame.Surface((30, 30))
+if not os.path.exists("Assets/img/icons/heart.png"):
+    heart_img.fill((255, 0, 0)) # Red square fallback
+
 # Game variables
 bg_color = (144, 201, 120)
 TILE_SIZE = 40
@@ -96,7 +101,32 @@ def draw_text(text, x, y):
 # Game states
 MENU = 0
 PLAYING = 1
+GAME_OVER = 2
 game_state = MENU
+
+def reset_level():
+    global scroll, screen_scroll, kills, player
+    scroll = 0
+    screen_scroll = 0
+    kills = 0
+    player_group.empty()
+    enemy_group.empty()
+    bullet_group.empty()
+    enemy_bullet_group.empty()
+    
+    # Respawn based on world_data
+    for y, row in enumerate(world_data):
+        for x, tile in enumerate(row):
+            if tile == 15: # Player
+                player = Player(x * TILE_SIZE, y * TILE_SIZE)
+                player_group.add(player)
+            elif tile == 16: # Enemy
+                enemy = Enemy(x * TILE_SIZE, y * TILE_SIZE)
+                enemy_group.add(enemy)
+                
+    if 'player' not in globals() or len(player_group) == 0:
+        player = Player(200, HEIGHT - 100)
+        player_group.add(player)
 
 running = True
 while running:
@@ -147,7 +177,10 @@ while running:
         # Check for collisions between enemy bullets and player
         if pygame.sprite.spritecollide(player, enemy_bullet_group, True):
             if player.alive:
-                player.alive = False
+                player.health -= 1
+                player.check_alive()
+                if not player.alive:
+                    game_state = GAME_OVER
 
         # Check for collisions between bullets and obstacles
         for bullet in bullet_group:
@@ -169,6 +202,18 @@ while running:
 
         # Draw UI
         draw_text(f"Kills: {kills}", 10, 10)
+        for i in range(player.health):
+            screen.blit(heart_img, (10 + (i * 35), 45))
+
+    elif game_state == GAME_OVER:
+        draw_bg()
+        draw_text("GAME OVER", WIDTH // 2 - 100, HEIGHT // 2 - 50)
+        draw_text(f"Final Kills: {kills}", WIDTH // 2 - 100, HEIGHT // 2)
+        draw_text("Press R to Respawn", WIDTH // 2 - 140, HEIGHT // 2 + 50)
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_r]:
+            reset_level()
+            game_state = PLAYING
 
     pygame.display.update()
 
