@@ -106,7 +106,7 @@ GAME_OVER = 2
 game_state = MENU
 
 def reset_level():
-    global scroll, screen_scroll, kills, player
+    global scroll, screen_scroll, kills, player, world, obstacle_list
     scroll = 0
     screen_scroll = 0
     kills = 0
@@ -115,6 +115,10 @@ def reset_level():
     bullet_group.empty()
     enemy_bullet_group.empty()
     
+    # Reset world to restore tile positions
+    world = World()
+    obstacle_list = world.process_data(world_data, level.tiles)
+
     # Respawn based on world_data
     for y, row in enumerate(world_data):
         for x, tile in enumerate(row):
