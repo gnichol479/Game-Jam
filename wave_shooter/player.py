@@ -24,6 +24,8 @@ class Player(pygame.sprite.Sprite):
         self.direction = 1
 
         self.shoot_cooldown = 0
+        self.health = 5
+        self.max_health = 5
         self.alive = True
         self.update_time = pygame.time.get_ticks()
 
@@ -54,19 +56,26 @@ class Player(pygame.sprite.Sprite):
         screen_scroll = 0
         dx = 0
         dy = 0
+        jumped_this_frame = False
 
-        keys = pygame.key.get_pressed()
+        if self.alive:
+            keys = pygame.key.get_pressed()
 
-        if keys[pygame.K_a]:
-            dx = -self.speed
-            self.flip = True
-            self.direction = -1
-        if keys[pygame.K_d]:
-            dx = self.speed
-            self.flip = False
-            self.direction = 1
-        if not keys[pygame.K_w]:
-            self.jumped = False
+            if keys[pygame.K_a]:
+                dx = -self.speed
+                self.flip = True
+                self.direction = -1
+            if keys[pygame.K_d]:
+                dx = self.speed
+                self.flip = False
+                self.direction = 1
+            if not keys[pygame.K_w]:
+                self.jumped = False
+            
+            if keys[pygame.K_w] and not self.jumped and not self.in_air:
+                self.vel_y = -15
+                self.jumped = True
+                jumped_this_frame = True
 
         # Gravity
         self.vel_y += GRAVITY
@@ -76,7 +85,6 @@ class Player(pygame.sprite.Sprite):
 
         # Collision with environment
         self.in_air = True
-        jumped_this_frame = False
 
         # Check for collision in x direction
         self.rect.x += dx
@@ -104,15 +112,11 @@ class Player(pygame.sprite.Sprite):
                     self.rect.bottom = tile[1].top
                     dy = 0
 
-        if keys[pygame.K_w] and not self.jumped and not self.in_air:
-            self.vel_y = -15
-            self.jumped = True
-            jumped_this_frame = True
-
         # Update scroll based on player position
-        if self.rect.right > WIDTH - SCROLL_THRESH or self.rect.left < SCROLL_THRESH:
-            self.rect.x -= dx
-            screen_scroll = -dx
+        if self.alive:
+            if self.rect.right > WIDTH - SCROLL_THRESH or self.rect.left < SCROLL_THRESH:
+                self.rect.x -= dx
+                screen_scroll = -dx
 
         # Animation switching
         if not self.alive:
@@ -160,5 +164,7 @@ class Player(pygame.sprite.Sprite):
             self.frame_index = 0
 
     def check_alive(self):
-        if not self.alive:
+        if self.health <= 0:
+            self.health = 0
             self.speed = 0
+            self.alive = False
