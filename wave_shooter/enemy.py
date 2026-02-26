@@ -76,7 +76,7 @@ class Enemy(pygame.sprite.Sprite):
             self.idling_counter = 20
             # Shoot
             if self.shoot_cooldown == 0:
-                self.shoot_cooldown = 40
+                self.shoot_cooldown = 120
                 bullet = bullet_class(self.rect.centerx + (0.8 * self.rect.size[0] * self.direction),
                                       self.rect.centery,
                                       self.direction)
