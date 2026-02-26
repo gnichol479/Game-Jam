@@ -25,6 +25,7 @@ class Player(pygame.sprite.Sprite):
 
         self.shoot_cooldown = 0
         self.alive = True
+        self.update_time = pygame.time.get_ticks()
 
     def load_animations(self):
         animation_types = ["Idle", "Run", "Jump", "Death"]
@@ -49,7 +50,8 @@ class Player(pygame.sprite.Sprite):
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
 
-    def move(self):
+    def move(self, obstacle_list):
+        screen_scroll = 0
         dx = 0
         dy = 0
 
@@ -63,10 +65,6 @@ class Player(pygame.sprite.Sprite):
             dx = self.speed
             self.flip = False
             self.direction = 1
-        if keys[pygame.K_w] and not self.jumped and not self.in_air:
-            self.vel_y = -15
-            self.jumped = True
-
         if not keys[pygame.K_w]:
             self.jumped = False
 
@@ -76,15 +74,45 @@ class Player(pygame.sprite.Sprite):
             self.vel_y = 10
         dy += self.vel_y
 
-        # Ground collision (temporary flat ground)
-        if self.rect.bottom + dy > HEIGHT - 50:
-            dy = HEIGHT - 50 - self.rect.bottom
-            self.in_air = False
-        else:
-            self.in_air = True
+        # Collision with environment
+        self.in_air = True
+        jumped_this_frame = False
 
+        # Check for collision in x direction
         self.rect.x += dx
+        for tile in obstacle_list:
+            if tile[1].colliderect(self.rect):
+                if dx > 0:
+                    self.rect.right = tile[1].left
+                if dx < 0:
+                    self.rect.left = tile[1].right
+                dx = 0
+
+        # Check for collision in y direction
         self.rect.y += dy
+        for tile in obstacle_list:
+            if tile[1].colliderect(self.rect):
+                # Check if below the ground (jumping)
+                if self.vel_y < 0:
+                    self.vel_y = 0
+                    self.rect.top = tile[1].bottom
+                    dy = 0
+                # Check if above the ground (falling)
+                elif self.vel_y >= 0:
+                    self.vel_y = 0
+                    self.in_air = False
+                    self.rect.bottom = tile[1].top
+                    dy = 0
+
+        if keys[pygame.K_w] and not self.jumped and not self.in_air:
+            self.vel_y = -15
+            self.jumped = True
+            jumped_this_frame = True
+
+        # Update scroll based on player position
+        if self.rect.right > WIDTH - SCROLL_THRESH or self.rect.left < SCROLL_THRESH:
+            self.rect.x -= dx
+            screen_scroll = -dx
 
         # Animation switching
         if not self.alive:
@@ -96,6 +124,8 @@ class Player(pygame.sprite.Sprite):
         else:
             self.update_action("Idle")
 
+        return screen_scroll, jumped_this_frame
+
     def shoot(self, bullet_group, bullet_class):
         if self.shoot_cooldown == 0:
             self.shoot_cooldown = 20
@@ -105,15 +135,21 @@ class Player(pygame.sprite.Sprite):
             bullet_group.add(bullet)
 
     def update_animation(self):
+        # Update animation
         ANIMATION_COOLDOWN = 100
-
+        # Update image depending on current frame
         self.image = self.animations[self.action][self.frame_index]
-
-        if pygame.time.get_ticks() % ANIMATION_COOLDOWN == 0:
+        if self.flip:
+            self.image = pygame.transform.flip(self.image, True, False)
+        
+        # Check if enough time has passed since the last update
+        if pygame.time.get_ticks() - self.update_time > ANIMATION_COOLDOWN:
+            self.update_time = pygame.time.get_ticks()
             self.frame_index += 1
 
+        # If the animation has run out then reset back to the start
         if self.frame_index >= len(self.animations[self.action]):
-            if self.action == "Death":
+            if self.action == 'Death':
                 self.frame_index = len(self.animations[self.action]) - 1
             else:
                 self.frame_index = 0
