@@ -29,9 +29,9 @@ class Player(pygame.sprite.Sprite):
         self.alive = True
         
         # Upgrades
-        self.double_jump = False
-        self.health_regen = False
-        self.double_fire = False
+        self.extra_jumps = 0
+        self.regen_level = 0
+        self.extra_bullets = 0
         self.jumps_left = 1
         self.regen_timer = 0
         
@@ -59,9 +59,10 @@ class Player(pygame.sprite.Sprite):
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
             
-        if self.health_regen and self.health < self.max_health and self.alive:
+        if self.regen_level > 0 and self.health < self.max_health and self.alive:
             self.regen_timer += 1
-            if self.regen_timer >= 300: # 5 seconds at 60 FPS
+            regen_threshold = max(60, 300 - (60 * (self.regen_level - 1)))
+            if self.regen_timer >= regen_threshold:
                 self.health += 1
                 self.regen_timer = 0
 
@@ -123,7 +124,7 @@ class Player(pygame.sprite.Sprite):
                 elif self.vel_y >= 0:
                     self.vel_y = 0
                     self.in_air = False
-                    self.jumps_left = 2 if self.double_jump else 1
+                    self.jumps_left = 1 + self.extra_jumps
                     self.rect.bottom = tile[1].top
                     dy = 0
 
@@ -153,11 +154,11 @@ class Player(pygame.sprite.Sprite):
                                   self.direction)
             bullet_group.add(bullet)
             
-            if self.double_fire:
-                bullet2 = bullet_class(self.rect.centerx + (0.8 * self.rect.size[0] * self.direction),
-                                      self.rect.centery - 15,
+            for i in range(self.extra_bullets):
+                bullet_extra = bullet_class(self.rect.centerx + (0.8 * self.rect.size[0] * self.direction),
+                                      self.rect.centery - (15 * (i + 1)),
                                       self.direction)
-                bullet_group.add(bullet2)
+                bullet_group.add(bullet_extra)
 
     def update_animation(self):
         # Update animation

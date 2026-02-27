@@ -4,9 +4,10 @@ import random
 from settings import *
 
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, level=1):
         super().__init__()
 
+        self.health = level
         self.animations = {}
         self.load_animations()
 
