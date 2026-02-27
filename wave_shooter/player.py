@@ -26,6 +26,8 @@ class Player(pygame.sprite.Sprite):
         self.shoot_cooldown = 0
         self.health = 10
         self.max_health = 10
+        self.shields = 0
+        self.max_shields = 0
         self.alive = True
         
         # Upgrades
@@ -59,12 +61,16 @@ class Player(pygame.sprite.Sprite):
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
             
-        if self.regen_level > 0 and self.health < self.max_health and self.alive:
-            self.regen_timer += 1
-            regen_threshold = max(60, 300 - (60 * (self.regen_level - 1)))
-            if self.regen_timer >= regen_threshold:
-                self.health += 1
-                self.regen_timer = 0
+        if self.regen_level > 0 and self.alive:
+            if self.health < self.max_health or self.shields < self.max_shields:
+                self.regen_timer += 1
+                regen_threshold = max(60, 300 - (60 * (self.regen_level - 1)))
+                if self.regen_timer >= regen_threshold:
+                    if self.health < self.max_health:
+                        self.health += 1
+                    elif self.shields < self.max_shields:
+                        self.shields += 1
+                    self.regen_timer = 0
 
     def move(self, obstacle_list):
         screen_scroll = 0

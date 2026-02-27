@@ -88,6 +88,8 @@ def reset_level(advance_level=False):
     old_extra_jumps = 0
     old_regen_level = 0
     old_extra_bullets = 0
+    old_shields = 0
+    old_max_shields = 0
     
     if advance_level:
         current_level += 1
@@ -95,6 +97,8 @@ def reset_level(advance_level=False):
             old_extra_jumps = player.extra_jumps
             old_regen_level = player.regen_level
             old_extra_bullets = player.extra_bullets
+            old_shields = player.shields
+            old_max_shields = player.max_shields
     else:
         kills = 0
         
@@ -143,6 +147,8 @@ def reset_level(advance_level=False):
         player.extra_jumps = old_extra_jumps
         player.regen_level = old_regen_level
         player.extra_bullets = old_extra_bullets
+        player.shields = old_shields
+        player.max_shields = old_max_shields
 
 # Initial setup call
 level = Level()
@@ -184,6 +190,10 @@ while running:
                 if event.key == pygame.K_3 and kills >= 15:
                     kills -= 15
                     player.extra_bullets += 1
+                if event.key == pygame.K_4 and kills >= 20:
+                    kills -= 20
+                    player.max_shields += 1
+                    player.shields += 1
 
     if game_state == MENU:
         draw_bg()
@@ -237,8 +247,13 @@ while running:
             # Check for collisions between enemy bullets and player
             if pygame.sprite.spritecollide(player, enemy_bullet_group, True):
                 if player.alive:
-                    player.health -= 1
-                    player.check_alive()
+                    if player.shields > 0:
+                        player.shields -= 1
+                    else:
+                        player.health -= 1
+                    if shot_sound: # This sound is typically for shooting, but included in the instruction.
+                        shot_sound.play()
+                    player.check_alive() # Ensure player's alive status is updated
                     if not player.alive:
                         game_state = GAME_OVER
 
@@ -271,9 +286,11 @@ while running:
 
         # Draw UI
         draw_text(f"Kills: {kills}", 10, 10)
-        draw_text("Press Q to Give Up", 10, 80)
+        draw_text("Press Q to Give Up", 10, 115)
         for i in range(player.health):
             screen.blit(heart_img, (10 + (i * 35), 45))
+        for i in range(player.shields):
+            pygame.draw.rect(screen, (0, 100, 255), (10 + (i * 35), 45 + 35, 25, 25))
 
         if game_state == PAUSED:
             # Draw semi-transparent overlay
@@ -305,6 +322,11 @@ while running:
             text3 = "3. Extra Bullets (Cost: 15 Kills)" + (f" [Level {player.extra_bullets}]" if player.extra_bullets > 0 else "")
             img3 = font.render(text3, True, color3)
             screen.blit(img3, (WIDTH // 2 - 200, 320))
+
+            color4 = (0, 255, 0) if kills >= 20 else (150, 150, 150)
+            text4 = "4. Max Shield (Cost: 20 Kills)" + (f" [Level {player.max_shields}]" if player.max_shields > 0 else "")
+            img4 = font.render(text4, True, color4)
+            screen.blit(img4, (WIDTH // 2 - 200, 380))
 
     elif game_state == GAME_OVER:
         draw_bg()

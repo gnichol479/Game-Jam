@@ -134,8 +134,8 @@ class Enemy(pygame.sprite.Sprite):
 
         # Ledge detection (only if on the ground and moving)
         if self.vel_y == 0 and dy == 0 and dx != 0:
-            ledge_check_x = self.rect.right + 2 if self.direction == 1 else self.rect.left - 2
-            ledge_check_y = self.rect.bottom + 2
+            ledge_check_x = self.rect.right + (TILE_SIZE // 2) if self.direction == 1 else self.rect.left - (TILE_SIZE // 2)
+            ledge_check_y = self.rect.bottom + 5
             on_ledge = True
             for tile in obstacle_list:
                 if tile[1].collidepoint(ledge_check_x, ledge_check_y):
