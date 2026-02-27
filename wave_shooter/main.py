@@ -103,13 +103,17 @@ def draw_text(text, x, y):
 MENU = 0
 PLAYING = 1
 GAME_OVER = 2
+PAUSED = 3
+STORE = 4
+LEVEL_COMPLETE = 5
 game_state = MENU
 
 def reset_level():
-    global scroll, screen_scroll, kills, player, world, obstacle_list
+    global scroll, screen_scroll, kills, player, world, obstacle_list, spawn_timer
     scroll = 0
     screen_scroll = 0
     kills = 0
+    spawn_timer = 0
     player_group.empty()
     enemy_group.empty()
     bullet_group.empty()
@@ -133,6 +137,7 @@ def reset_level():
         player = Player(200, HEIGHT - 100)
         player_group.add(player)
 
+spawn_timer = 0
 running = True
 while running:
     clock.tick(FPS)
@@ -144,6 +149,30 @@ while running:
             if event.key == pygame.K_SPACE and game_state == PLAYING and player.alive:
                 player.shoot(bullet_group, Bullet)
                 if shot_sound: shot_sound.play()
+            if event.key == pygame.K_ESCAPE:
+                if game_state == PLAYING:
+                    game_state = PAUSED
+                elif game_state == PAUSED:
+                    game_state = PLAYING
+                    
+            if event.key == pygame.K_q and game_state in [PLAYING, PAUSED, STORE] and player.alive:
+                player.health = 0
+                player.check_alive()
+                game_state = GAME_OVER
+                    
+            if event.key == pygame.K_TAB and game_state in [PLAYING, STORE] and player.alive:
+                game_state = STORE if game_state == PLAYING else PLAYING
+                
+            if game_state == STORE:
+                if event.key == pygame.K_1 and kills >= 5 and not player.double_jump:
+                    kills -= 5
+                    player.double_jump = True
+                if event.key == pygame.K_2 and kills >= 10 and not player.health_regen:
+                    kills -= 10
+                    player.health_regen = True
+                if event.key == pygame.K_3 and kills >= 15 and not player.double_fire:
+                    kills -= 15
+                    player.double_fire = True
 
     if game_state == MENU:
         draw_bg()
@@ -153,53 +182,71 @@ while running:
         if keys[pygame.K_SPACE]:
             game_state = PLAYING
 
-    elif game_state == PLAYING:
+    elif game_state in [PLAYING, PAUSED, STORE]:
         draw_bg()
         
         # Draw world tiles
         world.draw(screen, screen_scroll)
 
-        # Update sprites
-        screen_scroll, jumped = player.move(obstacle_list)
-        scroll -= screen_scroll # Total world scroll
-        
-        if jumped and jump_sound: 
-            jump_sound.play()
+        if game_state == PLAYING:
+            # Dynamic Spawning
+            spawn_timer += 1
+            if spawn_timer >= 360: # Spawn every 6 seconds
+                spawn_timer = 0
+                import random
+                spawn_x = random.randint(WIDTH + 50, WIDTH + 200)
+                new_enemy = Enemy(spawn_x, -50)
+                enemy_group.add(new_enemy)
+
+            # Update sprites
+            screen_scroll, jumped = player.move(obstacle_list)
+            scroll -= screen_scroll # Total world scroll
             
-        player_group.update()
-        enemy_group.update(screen_scroll, obstacle_list, player, enemy_bullet_group, Bullet)
-        bullet_group.update(screen_scroll)
-        enemy_bullet_group.update(screen_scroll)
-        
-        # Check for collisions between bullets and enemies
-        for enemy in enemy_group:
-            if pygame.sprite.spritecollide(enemy, bullet_group, True):
-                if enemy.alive:
-                    enemy.alive = False
-                    enemy.update_action("Death")
-                    kills += 1
+            if jumped and jump_sound: 
+                jump_sound.play()
+                
+            player_group.update()
+            enemy_group.update(screen_scroll, obstacle_list, player, enemy_bullet_group, Bullet)
+            bullet_group.update(screen_scroll)
+            enemy_bullet_group.update(screen_scroll)
+            
+            # Check for collisions between bullets and enemies
+            for enemy in enemy_group:
+                if pygame.sprite.spritecollide(enemy, bullet_group, True):
+                    if enemy.alive:
+                        enemy.alive = False
+                        enemy.update_action("Death")
+                        kills += 1
 
-        # Check for collisions between enemy bullets and player
-        if pygame.sprite.spritecollide(player, enemy_bullet_group, True):
-            if player.alive:
-                player.health -= 1
-                player.check_alive()
-                if not player.alive:
-                    game_state = GAME_OVER
+            # Check for collisions between enemy bullets and player
+            if pygame.sprite.spritecollide(player, enemy_bullet_group, True):
+                if player.alive:
+                    player.health -= 1
+                    player.check_alive()
+                    if not player.alive:
+                        game_state = GAME_OVER
 
-        # Check for collisions between bullets and obstacles
-        for bullet in bullet_group:
-            for tile in obstacle_list:
-                if tile[1].colliderect(bullet.rect):
-                    bullet.kill()
-                    break
-        for bullet in enemy_bullet_group:
-            for tile in obstacle_list:
-                if tile[1].colliderect(bullet.rect):
-                    bullet.kill()
-                    break
+            # Check for collisions between bullets and obstacles
+            for bullet in bullet_group:
+                for tile in obstacle_list:
+                    if tile[1].colliderect(bullet.rect):
+                        bullet.kill()
+                        break
+            for bullet in enemy_bullet_group:
+                for tile in obstacle_list:
+                    if tile[1].colliderect(bullet.rect):
+                        bullet.kill()
+                        break
 
-        # Draw sprites
+            # Handle falling off the map
+            if not player.alive:
+                game_state = GAME_OVER
+
+            # Handle reaching the end of the level
+            if abs(scroll) + player.rect.x > 5600:
+                game_state = LEVEL_COMPLETE
+
+        # Draw sprites (happens in both PLAYING and PAUSED)
         player_group.draw(screen)
         enemy_group.draw(screen)
         bullet_group.draw(screen)
@@ -207,14 +254,56 @@ while running:
 
         # Draw UI
         draw_text(f"Kills: {kills}", 10, 10)
+        draw_text("Press Q to Give Up", 10, 80)
         for i in range(player.health):
             screen.blit(heart_img, (10 + (i * 35), 45))
+
+        if game_state == PAUSED:
+            # Draw semi-transparent overlay
+            overlay = pygame.Surface((WIDTH, HEIGHT))
+            overlay.set_alpha(128)
+            overlay.fill((0, 0, 0))
+            screen.blit(overlay, (0, 0))
+            draw_text("PAUSED", WIDTH // 2 - 50, HEIGHT // 2 - 20)
+
+        elif game_state == STORE:
+            overlay = pygame.Surface((WIDTH, HEIGHT))
+            overlay.set_alpha(200)
+            overlay.fill((0, 0, 0))
+            screen.blit(overlay, (0, 0))
+            draw_text("UPGRADE STORE (Press TAB to Close)", WIDTH // 2 - 200, 50)
+            draw_text(f"Available Kills: {kills}", WIDTH // 2 - 100, 100)
+            
+            color1 = (0, 255, 0) if kills >= 5 and not player.double_jump else (150, 150, 150)
+            text1 = "1. Double Jump (Cost: 5 Kills)" + (" [BOUGHT]" if player.double_jump else "")
+            img1 = font.render(text1, True, color1)
+            screen.blit(img1, (WIDTH // 2 - 200, 200))
+
+            color2 = (0, 255, 0) if kills >= 10 and not player.health_regen else (150, 150, 150)
+            text2 = "2. Health Regen (Cost: 10 Kills)" + (" [BOUGHT]" if player.health_regen else "")
+            img2 = font.render(text2, True, color2)
+            screen.blit(img2, (WIDTH // 2 - 200, 260))
+
+            color3 = (0, 255, 0) if kills >= 15 and not player.double_fire else (150, 150, 150)
+            text3 = "3. Double Fire (Cost: 15 Kills)" + (" [BOUGHT]" if player.double_fire else "")
+            img3 = font.render(text3, True, color3)
+            screen.blit(img3, (WIDTH // 2 - 200, 320))
 
     elif game_state == GAME_OVER:
         draw_bg()
         draw_text("GAME OVER", WIDTH // 2 - 100, HEIGHT // 2 - 50)
         draw_text(f"Final Kills: {kills}", WIDTH // 2 - 100, HEIGHT // 2)
         draw_text("Press R to Respawn", WIDTH // 2 - 140, HEIGHT // 2 + 50)
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_r]:
+            reset_level()
+            game_state = PLAYING
+
+    elif game_state == LEVEL_COMPLETE:
+        draw_bg()
+        draw_text("LEVEL CLEARED!", WIDTH // 2 - 120, HEIGHT // 2 - 50)
+        draw_text(f"Final Kills: {kills}", WIDTH // 2 - 100, HEIGHT // 2)
+        draw_text("Press R to Restart", WIDTH // 2 - 130, HEIGHT // 2 + 50)
         keys = pygame.key.get_pressed()
         if keys[pygame.K_r]:
             reset_level()

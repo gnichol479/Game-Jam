@@ -76,7 +76,7 @@ class Enemy(pygame.sprite.Sprite):
             self.idling_counter = 20
             # Shoot
             if self.shoot_cooldown == 0:
-                self.shoot_cooldown = 120
+                self.shoot_cooldown = 240
                 bullet = bullet_class(self.rect.centerx + (0.8 * self.rect.size[0] * self.direction),
                                       self.rect.centery,
                                       self.direction)
@@ -130,6 +130,20 @@ class Enemy(pygame.sprite.Sprite):
                     self.vel_y = 0
                     self.rect.bottom = tile[1].top
                     dy = 0
+
+        # Ledge detection (only if on the ground and moving)
+        if self.vel_y == 0 and dy == 0 and dx != 0:
+            ledge_check_x = self.rect.right + 2 if self.direction == 1 else self.rect.left - 2
+            ledge_check_y = self.rect.bottom + 2
+            on_ledge = True
+            for tile in obstacle_list:
+                if tile[1].collidepoint(ledge_check_x, ledge_check_y):
+                    on_ledge = False
+                    break
+            if on_ledge:
+                self.direction *= -1
+                self.move_counter = 0
+                self.rect.x -= dx # undo move
 
         # Direction flip
         if self.direction == 1:

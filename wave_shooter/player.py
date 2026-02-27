@@ -24,9 +24,17 @@ class Player(pygame.sprite.Sprite):
         self.direction = 1
 
         self.shoot_cooldown = 0
-        self.health = 5
-        self.max_health = 5
+        self.health = 10
+        self.max_health = 10
         self.alive = True
+        
+        # Upgrades
+        self.double_jump = False
+        self.health_regen = False
+        self.double_fire = False
+        self.jumps_left = 1
+        self.regen_timer = 0
+        
         self.update_time = pygame.time.get_ticks()
 
     def load_animations(self):
@@ -48,9 +56,14 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         self.update_animation()
         self.check_alive()
-
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
+            
+        if self.health_regen and self.health < self.max_health and self.alive:
+            self.regen_timer += 1
+            if self.regen_timer >= 300: # 5 seconds at 60 FPS
+                self.health += 1
+                self.regen_timer = 0
 
     def move(self, obstacle_list):
         screen_scroll = 0
@@ -72,10 +85,11 @@ class Player(pygame.sprite.Sprite):
             if not keys[pygame.K_w]:
                 self.jumped = False
             
-            if keys[pygame.K_w] and not self.jumped and not self.in_air:
+            if keys[pygame.K_w] and not self.jumped and self.jumps_left > 0:
                 self.vel_y = -15
                 self.jumped = True
                 jumped_this_frame = True
+                self.jumps_left -= 1
 
         # Gravity
         self.vel_y += GRAVITY
@@ -109,6 +123,7 @@ class Player(pygame.sprite.Sprite):
                 elif self.vel_y >= 0:
                     self.vel_y = 0
                     self.in_air = False
+                    self.jumps_left = 2 if self.double_jump else 1
                     self.rect.bottom = tile[1].top
                     dy = 0
 
@@ -137,6 +152,12 @@ class Player(pygame.sprite.Sprite):
                                   self.rect.centery,
                                   self.direction)
             bullet_group.add(bullet)
+            
+            if self.double_fire:
+                bullet2 = bullet_class(self.rect.centerx + (0.8 * self.rect.size[0] * self.direction),
+                                      self.rect.centery - 15,
+                                      self.direction)
+                bullet_group.add(bullet2)
 
     def update_animation(self):
         # Update animation
@@ -164,7 +185,7 @@ class Player(pygame.sprite.Sprite):
             self.frame_index = 0
 
     def check_alive(self):
-        if self.health <= 0:
+        if self.health <= 0 or self.rect.top > HEIGHT:
             self.health = 0
             self.speed = 0
             self.alive = False
